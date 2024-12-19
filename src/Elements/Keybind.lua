@@ -77,30 +77,30 @@ function Element:New(Idx, Config)
 	})
 
 	function Keybind:GetState()
-		if UserInputService:GetFocusedTextBox() and Keybind.Mode ~= "Always" then
-			return false
-		end
+        if UserInputService:GetFocusedTextBox() and Keybind.Mode ~= "Always" then
+            return false
+        end
 
-		if Keybind.Mode == "Always" then
-			return true
-		elseif Keybind.Mode == "Hold" then
-			if Keybind.Value == "None" then
-				return false
-			end
+        if Keybind.Mode == "Always" then
+            return true
+        elseif Keybind.Mode == "Hold" then
+            if Keybind.Value == "None" then
+                return false
+            end
 
-			local Key = Keybind.Value
+            local Key = Keybind.Value
 
-			if Key == "MouseLeft" or Key == "MouseRight" then
-				return Key == "MouseLeft" and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
-					or Key == "MouseRight"
-						and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-			else
-				return UserInputService:IsKeyDown(Enum.KeyCode[Keybind.Value])
-			end
-		else
-			return Keybind.Toggled
-		end
-	end
+            if Key == "MouseLeft" or Key == "MouseRight" then
+                return Key == "MouseLeft" and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+                    or Key == "MouseRight"
+                        and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+            else
+                return UserInputService:IsKeyDown(Enum.KeyCode[Keybind.Value])
+            end
+        else
+            return Keybind.Toggled
+        end
+    end
 
 	function Keybind:SetValue(Key, Mode)
 		Key = Key or Keybind.Key
@@ -112,8 +112,49 @@ function Element:New(Idx, Config)
 	end
 
 	function Keybind:OnClick(Callback)
-		Keybind.Clicked = Callback
-	end
+        Keybind.Clicked = Callback
+        -- Set up the input listener inside the OnClick function to listen only when clicked
+        KeybindDisplayFrame.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+                Picking = true
+                KeybindDisplayLabel.Text = "..."
+
+                wait(0.2)
+
+                local Event
+                Event = UserInputService.InputBegan:Connect(function(Input)
+                    local Key
+
+                    if Input.UserInputType == Enum.UserInputType.Keyboard then
+                        Key = Input.KeyCode.Name
+                    elseif Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        Key = "MouseLeft"
+                    elseif Input.UserInputType == Enum.UserInputType.MouseButton2 then
+                        Key = "MouseRight"
+                    end
+
+                    local EndedEvent
+                    EndedEvent = UserInputService.InputEnded:Connect(function(Input)
+                        if
+                            Input.KeyCode.Name == Key
+                            or Key == "MouseLeft" and Input.UserInputType == Enum.UserInputType.MouseButton1
+                            or Key == "MouseRight" and Input.UserInputType == Enum.UserInputType.MouseButton2
+                        then
+                            Picking = false
+
+                            KeybindDisplayLabel.Text = Key
+                            Keybind.Value = Key
+
+                            Library:SafeCallback(Keybind.ChangedCallback, Input.KeyCode or Input.UserInputType)
+                            Library:SafeCallback(Keybind.Changed, Input.KeyCode or Input.UserInputType)
+
+                            Event:Disconnect()
+                            EndedEvent:Disconnect()
+                        end
+                    end)
+                end)
+            end
+        end)
 
 	function Keybind:OnChanged(Callback)
 		Keybind.Changed = Callback
@@ -130,74 +171,29 @@ function Element:New(Idx, Config)
 		Library.Options[Idx] = nil
 	end
 
-	Creator.AddSignal(KeybindDisplayFrame.InputBegan, function(Input)
-		if
-			Input.UserInputType == Enum.UserInputType.MouseButton1
-			or Input.UserInputType == Enum.UserInputType.Touch
-		then
-			Picking = true
-			KeybindDisplayLabel.Text = "..."
-
-			wait(0.2)
-
-			local Event
-			Event = UserInputService.InputBegan:Connect(function(Input)
-				local Key
-
-				if Input.UserInputType == Enum.UserInputType.Keyboard then
-					Key = Input.KeyCode.Name
-				elseif Input.UserInputType == Enum.UserInputType.MouseButton1 then
-					Key = "MouseLeft"
-				elseif Input.UserInputType == Enum.UserInputType.MouseButton2 then
-					Key = "MouseRight"
-				end
-
-				local EndedEvent
-				EndedEvent = UserInputService.InputEnded:Connect(function(Input)
-					if
-						Input.KeyCode.Name == Key
-						or Key == "MouseLeft" and Input.UserInputType == Enum.UserInputType.MouseButton1
-						or Key == "MouseRight" and Input.UserInputType == Enum.UserInputType.MouseButton2
-					then
-						Picking = false
-
-						KeybindDisplayLabel.Text = Key
-						Keybind.Value = Key
-
-						Library:SafeCallback(Keybind.ChangedCallback, Input.KeyCode or Input.UserInputType)
-						Library:SafeCallback(Keybind.Changed, Input.KeyCode or Input.UserInputType)
-
-						Event:Disconnect()
-						EndedEvent:Disconnect()
-					end
-				end)
-			end)
-		end
-	end)
-
 	Creator.AddSignal(UserInputService.InputBegan, function(Input)
-		if not Picking and not UserInputService:GetFocusedTextBox() then
-			if Keybind.Mode == "Toggle" then
-				local Key = Keybind.Value
+            if not Picking and not UserInputService:GetFocusedTextBox() then
+                if Keybind.Mode == "Toggle" then
+                    local Key = Keybind.Value
 
-				if Key == "MouseLeft" or Key == "MouseRight" then
-					if
-						Key == "MouseLeft" and Input.UserInputType == Enum.UserInputType.MouseButton1
-						or Key == "MouseRight" and Input.UserInputType == Enum.UserInputType.MouseButton2
-					then
-						Keybind.Toggled = not Keybind.Toggled
-						Keybind:DoClick()
-					end
-				elseif Input.UserInputType == Enum.UserInputType.Keyboard then
-					if Input.KeyCode.Name == Key then
-						Keybind.Toggled = not Keybind.Toggled
-						Keybind:DoClick()
-					end
-				end
-			end
-		end
-	end)
-
+                    if Key == "MouseLeft" or Key == "MouseRight" then
+                        if
+                            Key == "MouseLeft" and Input.UserInputType == Enum.UserInputType.MouseButton1
+                            or Key == "MouseRight" and Input.UserInputType == Enum.UserInputType.MouseButton2
+                        then
+                            Keybind.Toggled = not Keybind.Toggled
+                            Keybind:DoClick()
+                        end
+                    elseif Input.UserInputType == Enum.UserInputType.Keyboard then
+                        if Input.KeyCode.Name == Key then
+                            Keybind.Toggled = not Keybind.Toggled
+                            Keybind:DoClick()
+                        end
+                    end
+                end
+            end
+        end)
+    end
 	Library.Options[Idx] = Keybind
 	return Keybind
 end
